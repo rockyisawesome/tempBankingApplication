@@ -1,0 +1,99 @@
+networks:
+  kafka-net:
+    driver: bridge
+services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    hostname: zookeeper
+    networks:
+      - kafka-net
+    ports:
+      - "2181:2181"
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKeeper_TICK_TIME=2000
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  kafka:
+    image: bitnami/kafka:latest
+    hostname: kafka
+    networks:
+      - kafka-net
+    ports:
+      - "9092:9092"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:  
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--list", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+  postgres:
+    image: postgres:latest
+    hostname: postgres
+    networks:
+      - kafka-net
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=abcd
+      - POSTGRES_DB=accounts
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  appproducer:
+    build: ./accountProducer
+    hostname: appproducer
+    networks:
+      - kafka-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - POSTGRES_URL=postgres://postgres:abcd@postgres:5432/accounts
+    ports:
+      - "9091:9091"
+  appconsumer:
+    build: ./accountservice
+    hostname: appconsumer
+    networks:
+      - kafka-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - POSTGRES_URL=postgres://postgres:abcd@postgres:5432/accounts
+volumes:
+  zookeeper-data:
+  kafka-data:
+  postgres-data:

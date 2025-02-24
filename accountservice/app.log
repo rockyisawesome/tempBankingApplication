@@ -1,9 +1,1 @@
-2025-02-22T01:32:36.098+0530 [INFO]  Banking App: starting server on : Port=0xc000048300
-2025-02-23T12:29:24.121+0530 [INFO]  Banking App: System Interruptions Received: EXTRA_VALUE_AT_END=interrupt
-2025-02-23T12:29:24.122+0530 [INFO]  Banking App: Error starting server: EXTRA_VALUE_AT_END="http: Server closed"
-2025-02-23T12:30:14.377+0530 [INFO]  Banking App: starting server on : Port=0xc000048300
-2025-02-23T12:36:39.997+0530 [INFO]  Banking App: System Interruptions Received: EXTRA_VALUE_AT_END=interrupt
-2025-02-23T12:36:39.999+0530 [INFO]  Banking App: Error starting server: EXTRA_VALUE_AT_END="http: Server closed"
-2025-02-23T12:36:43.500+0530 [INFO]  Banking App: starting server on : Port=0xc000048300
-2025-02-23T12:41:24.748+0530 [INFO]  Banking App: System Interruptions Received: EXTRA_VALUE_AT_END=interrupt
-2025-02-23T12:41:24.753+0530 [INFO]  Banking App: Error starting server: EXTRA_VALUE_AT_END="http: Server closed"
+2025-02-24T11:30:07.219+0530 [INFO]  Banking App: Hell World

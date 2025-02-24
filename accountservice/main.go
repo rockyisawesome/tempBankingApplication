@@ -1,19 +1,22 @@
 package main
 
 import (
-	"accountservice/configurations"
 	"accountservice/database"
-	"accountservice/handlers"
+	"accountservice/kafka"
 	"context"
 	"fmt"
-	"net/http"
+	"log"
 	"os"
 	"os/signal"
-	"time"
+	"sync"
+	"syscall"
 
-	"github.com/gorilla/mux"
+	"github.com/IBM/sarama"
 	"github.com/hashicorp/go-hclog"
 )
+
+// producer work is to produce data and publish it to the kafka topic
+// our gateawy can act as a producer
 
 func main() {
 
@@ -33,15 +36,19 @@ func main() {
 		JSONFormat: false,
 	})
 
-	// get the URI
-	uri, err := configurations.NewAppConfig()
-	if err != nil {
-		loggs.Error("Not able to create Retrieve App Configurations")
-		os.Exit(1)
-	}
+	loggs.Info("Hell World")
+
+	// // get the URI
+	// uri, err := configurations.NewAppConfig()
+	// if err != nil {
+	// 	loggs.Error("Not able to create Retrieve App Configurations")
+	// 	os.Exit(1)
+	// }
 
 	// Connect to PostgreSQL
-	dsn := "postgres://postgres:abcd@localhost:5432/accounts?sslmode=disable"
+	// dsn := "postgres://postgres:abcd@localhost:5432/accounts?sslmode=disable"
+	dsn := "postgres://postgres:abcd@postgres:5432/accounts?sslmode=disable"
+
 	db := database.NewPostgresPoolDB(dsn, 10, 2)
 	ctx := context.Background()
 
@@ -52,49 +59,57 @@ func main() {
 	defer db.Close(ctx)
 
 	// handlers
-	handler := handlers.NewUserHandler(db)
+	kafkaConsumer := kafka.NewKafkaConsumer(db)
 
-	// router
-	router := mux.NewRouter()
+	// Kafka configuration
+	config := sarama.NewConfig()
+	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Return.Errors = true
+	brokers := []string{"kafka:9092"}
+	groupID := "account-creation-group"
 
-	// register handlers
-	handler.RegisterRoutes(router)
-
-	opts := hclog.StandardLoggerOptions{
-		InferLevels: true,
+	// Create consumer group
+	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
+	if err != nil {
+		log.Fatalf("Failed to start consumer group: %v", err)
 	}
+	defer consumerGroup.Close()
 
-	// //cerate a new server
-	httpServer := http.Server{
-		Addr:         *uri.GetAppURI(),
-		Handler:      router,
-		ErrorLog:     loggs.StandardLogger(&opts),
-		ReadTimeout:  5 * time.Second,   // max time to read request from the client
-		WriteTimeout: 10 * time.Second,  // max time to write response to the client
-		IdleTimeout:  120 * time.Second, // max time for connections using TCP Keep-Alive
-	}
+	// Handle graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 
 	go func() {
-		loggs.Info("starting server on ", "Port", uri.GetAppURI())
-		err := httpServer.ListenAndServe()
-		if err != nil {
-			loggs.Info("Error starting server", err)
-			os.Exit(1)
+		defer wg.Done()
+		for {
+			// Reconnect and resume on errors
+			err = consumerGroup.Consume(ctx, []string{"account-creation"}, kafkaConsumer)
+			if err != nil {
+				log.Printf("Consumer error: %v", err)
+			}
+			if ctx.Err() != nil {
+				return // Exit if context is canceled
+			}
 		}
 	}()
 
-	//gracefully shutting down the server
-	signalChannel := make(chan os.Signal)
-	signal.Notify(signalChannel, os.Interrupt)
-	signal.Notify(signalChannel, os.Kill)
+	// Listen for errors
+	go func() {
+		for err := range consumerGroup.Errors() {
+			log.Printf("Consumer group error: %v", err)
+		}
+	}()
 
-	//blocking statement
-	waitingForChanel := <-signalChannel
+	log.Println("Consumer group started. Waiting for messages...")
 
-	loggs.Info("System Interruptions Received", waitingForChanel)
+	// Handle SIGINT/SIGTERM for shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
 
-	//gracefully shutting down the server
-
-	newctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	httpServer.Shutdown(newctx)
+	log.Println("Shutting down consumer...")
+	cancel()
+	wg.Wait()
 }

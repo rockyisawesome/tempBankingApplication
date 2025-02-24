@@ -5,7 +5,7 @@ import (
 )
 
 var appConfig *appConfigs
-var goUri *string = env.String("GO_URI", false, "0.0.0.0:9090", "Bind address for the app server")
+var goUri *string = env.String("GO_URI", false, "0.0.0.0:9091", "Bind address for the app server")
 
 type appConfigs struct {
 	appURI string
