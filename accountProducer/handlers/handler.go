@@ -26,6 +26,17 @@ func NewUserHandler(db database.Database, lobbs *hclog.Logger) *AccountHandler {
 	}
 }
 
+// CreateUser godoc
+// @Summary Create a new user account
+// @Description Creates a new user account and sends the request to Kafka for processing
+// @Tags accounts
+// @Accept json
+// @Produce json
+// @Param account body models.Account true "Account details"
+// @Success 200 {object} map[string]interface{} "success: true, msg: account creation request placed successfully"
+// @Failure 400 {object} map[string]string "error: Invalid request body"
+// @Failure 500 {object} map[string]string "error: Internal server error or Kafka failure"
+// @Router /accounts [post]
 func (h *AccountHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// decoding
 	var account models.Account
@@ -62,6 +73,17 @@ func (h *AccountHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CreditAmount godoc
+// @Summary Credit an amount to an account
+// @Description Records a credit transaction and sends it to Kafka
+// @Tags transactions
+// @Accept json
+// @Produce json
+// @Param transaction body models.Transaction true "Transaction details"
+// @Success 200 {object} map[string]interface{} "success: true, msg: Credit Transaction Successfully Recorded"
+// @Failure 400 {object} map[string]string "error: Invalid request body"
+// @Failure 500 {object} map[string]string "error: Internal server error or Kafka failure"
+// @Router /credit [post]
 func (h *AccountHandler) CreditAmount(w http.ResponseWriter, r *http.Request) {
 	// decoding
 	var transaction models.Transaction
@@ -97,6 +119,17 @@ func (h *AccountHandler) CreditAmount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// WithdrawAmount godoc
+// @Summary Withdraw an amount from an account
+// @Description Records a withdrawal transaction and sends it to Kafka
+// @Tags transactions
+// @Accept json
+// @Produce json
+// @Param transaction body models.Transaction true "Transaction details"
+// @Success 200 {object} map[string]interface{} "success: true, msg: Withdraw Transaction Successfully Recorded"
+// @Failure 400 {object} map[string]string "error: Invalid request body"
+// @Failure 500 {object} map[string]string "error: Internal server error or Kafka failure"
+// @Router /debit [post]
 func (h *AccountHandler) WithdrawAmount(w http.ResponseWriter, r *http.Request) {
 	// decoding
 	var transaction models.Transaction
@@ -132,6 +165,17 @@ func (h *AccountHandler) WithdrawAmount(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// TransferAmount godoc
+// @Summary Transfer an amount between accounts
+// @Description Records a transfer transaction and sends it to Kafka
+// @Tags transactions
+// @Accept json
+// @Produce json
+// @Param transaction body models.Transaction true "Transaction details"
+// @Success 200 {object} map[string]interface{} "success: true, msg: Transfer Transaction Successfully Recorded"
+// @Failure 400 {object} map[string]string "error: Invalid request body"
+// @Failure 500 {object} map[string]string "error: Internal server error or Kafka failure"
+// @Router /transfer [post]
 func (h *AccountHandler) TransferAmount(w http.ResponseWriter, r *http.Request) {
 	// decoding
 	var transaction models.Transaction
@@ -167,7 +211,18 @@ func (h *AccountHandler) TransferAmount(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// Handler function
+// FindTransactionHistory godoc
+// @Summary Retrieve transaction history for an account
+// @Description Fetches a list of transactions associated with the specified account number from the ledger.
+// @Tags transactions
+// @Accept json
+// @Produce json
+// @Param accountNumber path string true "Account Number" example:"Acc1234" description:"The unique identifier of the account (e.g., 'Acc1234')"
+// @Success 200 {array} models.TransactionLedger "Successful response with a list of transactions"
+// @Success 200 {object} []models.TransactionLedger "Empty list if no transactions are found"
+// @Failure 400 {object} map[string]string "error: Account number is required" example:{"error":"Account number is required"}
+// @Failure 500 {object} map[string]string "error: Failed to get transactions" example:{"error":"Failed to get transactions: database connection error"}
+// @Router /transactions/{accountNumber} [get]
 func (h *AccountHandler) FindTransactionHistory(w http.ResponseWriter, r *http.Request) {
 	// Extract path variables
 	vars := mux.Vars(r)
