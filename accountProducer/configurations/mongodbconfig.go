@@ -10,7 +10,7 @@ type MongoDbConfig struct {
 // mongodb://admin:secret@mongo:27017/ledger?authSource=admin
 
 func NewMongoDbConfig() (*MongoDbConfig, error) {
-	var mongouri *string = env.String("MONGO_URI", false, "mongodb://admin:abcd@localhost:27017/ledger?authSource=admin", "Bind address for the Mongo server")
+	var mongouri *string = env.String("MONGO_URI", false, "mongodb://admin:abcd@mongo:27017/ledger?authSource=admin", "Bind address for the Mongo server")
 	var dbname *string = env.String("DB_NAME", false, "ledger", "Bind address for the Mongo server")
 	if err := env.Parse(); err != nil {
 		return nil, err

@@ -74,7 +74,7 @@ func (mango *MongoDB) GetTransactionsByAccountNumber(ctx context.Context, accoun
 	defer cancel()
 
 	// Define the filter to match accountNumber
-	filter := bson.M{"accountNumber": accountNumber}
+	filter := bson.M{"from_account_id": accountNumber}
 
 	// Execute the query
 	cursor, err := collection.Find(ctx, filter)

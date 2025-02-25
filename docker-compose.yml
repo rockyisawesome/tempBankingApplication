@@ -177,6 +177,8 @@ services:
     networks:
       - kafka-net
     depends_on:
+      kafka:
+        condition: service_healthy
       kafkamongo:
         condition: service_healthy
       mongo:
