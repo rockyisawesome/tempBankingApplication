@@ -1,13 +1,13 @@
 package kafka
 
 import (
-	"accountservice/database"
-	"accountservice/models"
-	"accountservice/repositories"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"transactionService/database"
+	"transactionService/models"
+	"transactionService/repositories"
 
 	"github.com/IBM/sarama"
 )
@@ -24,23 +24,42 @@ func NewKafkaConsumer(db *database.PostgresPoolDB) *KafkaConsumer {
 
 func (h KafkaConsumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		var account models.Account
-		err := json.Unmarshal(msg.Value, &account)
+		var trans models.Transaction
+		err := json.Unmarshal(msg.Value, &trans)
 		if err != nil {
 			log.Printf("Failed to unmarshal message (offset %d): %v", msg.Offset, err)
 			continue
 		}
 
 		ctx := context.Background()
-		fmt.Println(account)
-		// Process the account (e.g., save to DB)
-		err = h.repo.Create(ctx, &account)
+		fmt.Println(trans)
+		// Process the transaction
+		kafkapush := KafkaController{}
+		err = h.repo.TransactionRouter(ctx, &trans)
 		if err != nil {
 			fmt.Println(err)
+			//push to dead order queue
+			err = kafkapush.PushToQueue("dead-ledger", &trans)
+			if err != nil {
+				fmt.Println(err)
+				return err
+			}
+			return nil
+		}
+		// push transacation into mongo ledger service
+		err = kafkapush.PushToQueue("transaction-ledger", &trans)
+		if err != nil {
+			fmt.Println(err)
+			//push to dead order queue
+			err = kafkapush.PushToQueue("dead-ledger", &trans)
+			if err != nil {
+				fmt.Println(err)
+				return err
+			}
 			return nil
 		}
 
-		log.Printf("Processed account: %+v (partition %d, offset %d)", account, msg.Partition, msg.Offset)
+		log.Printf("Processed trnsaction: %+v (partition %d, offset %d)", trans.FromAccountID, msg.Partition, msg.Offset)
 		fmt.Println("Account is saved in postgres")
 		// Mark message as processed (commit offset)
 		session.MarkMessage(msg, "")

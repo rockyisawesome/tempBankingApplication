@@ -1,10 +1,11 @@
 package main
 
 import (
-	"accountservice/database"
-	"accountservice/kafka"
 	"context"
 	"fmt"
+	"ledgerservice/configurations"
+	"ledgerservice/database"
+	"ledgerservice/kafka"
 	"log"
 	"os"
 	"os/signal"
@@ -35,28 +36,33 @@ func main() {
 
 	loggs.Info("Hell World")
 
-	dsn := "postgres://postgres:abcd@postgres:5432/accounts?sslmode=disable"
+	// getting mongodb configurations
+	mongodbconfig, err := configurations.NewMongoDbConfig()
+	if err != nil {
+		loggs.Error("Not able to create Retrieve App Configurations")
+		os.Exit(1)
+	}
 
-	db := database.NewPostgresPoolDB(dsn, 10, 2)
+	mongodb := database.NewMongoDB(mongodbconfig, &loggs)
 	ctx := context.Background()
 
-	if err := db.Connect(ctx); err != nil {
+	if err := mongodb.Connect(ctx); err != nil {
 		fmt.Printf("Connection failed: %v\n", err)
 		return
 	}
-	defer db.Close(ctx)
+	defer mongodb.Disconnect(ctx)
 
-	// handlers
-	kafkaConsumer := kafka.NewKafkaConsumer(db)
+	// kafka connsumer function
+	kafkaConsumer := kafka.NewKafkaConsumer(mongodb, &loggs)
 
 	// Kafka configuration
 	config := sarama.NewConfig()
 	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Consumer.Return.Errors = true
-	brokers := []string{"kafka:9092"}
-	groupID := "account-creation-group"
-
+	brokers := []string{"kafkamongo:9092"}
+	groupID := "ledger-consumtion-group"
+	topicName := []string{"transaction-ledger"}
 	// Create consumer group
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
 	if err != nil {
@@ -73,12 +79,12 @@ func main() {
 		defer wg.Done()
 		for {
 			// Reconnect and resume on errors
-			err = consumerGroup.Consume(ctx, []string{"account-creation"}, kafkaConsumer)
+			err = consumerGroup.Consume(ctx, topicName, kafkaConsumer)
 			if err != nil {
 				log.Printf("Consumer error: %v", err)
 			}
 			if ctx.Err() != nil {
-				return // Exit if context is canceled
+				return
 			}
 		}
 	}()

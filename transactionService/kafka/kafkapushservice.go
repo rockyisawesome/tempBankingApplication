@@ -1,9 +1,11 @@
 package kafka
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
+	"transactionService/models"
 
 	"github.com/IBM/sarama"
 )
@@ -11,9 +13,18 @@ import (
 type KafkaController struct {
 }
 
+func (k *KafkaController) PushToQueue(topic string, trans *models.Transaction) error {
+	msg, err := json.Marshal(trans)
+	if err != nil {
+		return err
+	}
+	return k.PushOrderToQueue(topic, msg)
+
+}
+
 func (k *KafkaController) PushOrderToQueue(topic string, message []byte) error {
 
-	brokers := []string{"kafka:9092"}
+	brokers := []string{"kafkamongo:9092"}
 	producer, err := k.connectProducer(brokers, topic)
 	if err != nil {
 		return err
@@ -32,7 +43,7 @@ func (k *KafkaController) PushOrderToQueue(topic string, message []byte) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Account post request is stored", topic, partition, offset)
+	fmt.Println("Transaction stored in Ledger service", topic, partition, offset)
 	return nil
 
 }

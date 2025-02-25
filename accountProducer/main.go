@@ -2,6 +2,7 @@ package main
 
 import (
 	"accountProducer/configurations"
+	"accountProducer/database"
 	"accountProducer/handlers"
 	"context"
 	"fmt"
@@ -49,8 +50,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// getting mongodb configurations
+	mongodbconfig, err := configurations.NewMongoDbConfig()
+	if err != nil {
+		loggs.Error("Not able to create Retrieve App Configurations")
+		os.Exit(1)
+	}
+
+	mongodb := database.NewMongoDB(mongodbconfig, &loggs)
+	ctx := context.Background()
+
+	if err := mongodb.Connect(ctx); err != nil {
+		fmt.Printf("Connection failed: %v\n", err)
+		return
+	}
+	defer mongodb.Disconnect(ctx)
+
 	// handlers
-	handler := handlers.NewUserHandler()
+	handler := handlers.NewUserHandler(mongodb, &loggs)
 
 	// router
 	router := mux.NewRouter()

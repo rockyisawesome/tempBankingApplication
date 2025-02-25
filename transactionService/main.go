@@ -1,8 +1,6 @@
 package main
 
 import (
-	"accountservice/database"
-	"accountservice/kafka"
 	"context"
 	"fmt"
 	"log"
@@ -10,6 +8,8 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"transactionService/database"
+	"transactionService/kafka"
 
 	"github.com/IBM/sarama"
 	"github.com/hashicorp/go-hclog"
@@ -55,7 +55,8 @@ func main() {
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Consumer.Return.Errors = true
 	brokers := []string{"kafka:9092"}
-	groupID := "account-creation-group"
+	groupID := "transaction-group"
+	topics := []string{"transaction"}
 
 	// Create consumer group
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, config)
@@ -73,7 +74,7 @@ func main() {
 		defer wg.Done()
 		for {
 			// Reconnect and resume on errors
-			err = consumerGroup.Consume(ctx, []string{"account-creation"}, kafkaConsumer)
+			err = consumerGroup.Consume(ctx, topics, kafkaConsumer)
 			if err != nil {
 				log.Printf("Consumer error: %v", err)
 			}

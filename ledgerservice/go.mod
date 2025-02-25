@@ -1,13 +1,10 @@
-module accountProducer
+module ledgerservice
 
 go 1.23.5
 
 require (
 	github.com/IBM/sarama v1.45.0
-	github.com/google/uuid v1.6.0
-	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/go-hclog v1.6.3
-	github.com/joho/godotenv v1.5.1
 	github.com/nicholasjackson/env v0.6.1
 	go.mongodb.org/mongo-driver/v2 v2.0.1
 )

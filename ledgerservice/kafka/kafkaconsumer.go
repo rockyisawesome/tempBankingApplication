@@ -1,47 +1,50 @@
 package kafka
 
 import (
-	"accountservice/database"
-	"accountservice/models"
-	"accountservice/repositories"
 	"context"
 	"encoding/json"
 	"fmt"
+	"ledgerservice/database"
+	"ledgerservice/models"
+	"ledgerservice/repositories"
 	"log"
 
 	"github.com/IBM/sarama"
+	"github.com/hashicorp/go-hclog"
 )
 
 type KafkaConsumer struct {
-	repo repositories.Repository
+	repo  repositories.Repository
+	loggs *hclog.Logger
 }
 
-func NewKafkaConsumer(db *database.PostgresPoolDB) *KafkaConsumer {
+func NewKafkaConsumer(db database.Database, lobbs *hclog.Logger) *KafkaConsumer {
 	return &KafkaConsumer{
-		repo: repositories.NewUserRepository(db),
+		repo:  repositories.NewTransactionRepository(db, lobbs),
+		loggs: lobbs,
 	}
 }
 
 func (h KafkaConsumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		var account models.Account
-		err := json.Unmarshal(msg.Value, &account)
+		var trans models.TransactionLedger
+		err := json.Unmarshal(msg.Value, &trans)
 		if err != nil {
 			log.Printf("Failed to unmarshal message (offset %d): %v", msg.Offset, err)
 			continue
 		}
 
 		ctx := context.Background()
-		fmt.Println(account)
-		// Process the account (e.g., save to DB)
-		err = h.repo.Create(ctx, &account)
+		fmt.Println(trans)
+		// Add the transaction into transaction ledger
+		err = h.repo.InsertTransaction(ctx, trans)
 		if err != nil {
 			fmt.Println(err)
 			return nil
 		}
 
-		log.Printf("Processed account: %+v (partition %d, offset %d)", account, msg.Partition, msg.Offset)
-		fmt.Println("Account is saved in postgres")
+		log.Printf("Processed Transaction: %+v (partition %d, offset %d)", trans, msg.Partition, msg.Offset)
+		fmt.Println("Transaction is logged")
 		// Mark message as processed (commit offset)
 		session.MarkMessage(msg, "")
 	}
